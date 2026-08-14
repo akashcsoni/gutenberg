@@ -20,6 +20,7 @@
 ### Bug Fixes
 
 -   `Card`: Use the normal neutral surface stroke for the default border. ([#81746](https://github.com/WordPress/gutenberg/pull/81746))
+-   `Notice`: Fix a crash when a child using hooks is conditionally rendered ([#81640](https://github.com/WordPress/gutenberg/pull/81640)).
 
 ### Documentation
 
