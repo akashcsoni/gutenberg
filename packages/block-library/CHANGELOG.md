@@ -6,6 +6,10 @@
 
 -   Heading: Declare the heading level and paragraph keyboard shortcuts on the block's variations and transforms, rather than in a `BlockKeyboardShortcuts` component that every editor had to render. The `BlockKeyboardShortcuts` private export has been removed ([#81588](https://github.com/WordPress/gutenberg/pull/81588)).
 
+### Enhancements
+
+-   Button: Offer the "Mark as nofollow" setting in the content panel link field, matching the block's toolbar link popover ([#81636](https://github.com/WordPress/gutenberg/pull/81636)).
+
 ### Bug Fixes
 
 -   Icon: Apply only padding to the inner SVG in the editor, so margin is no longer applied twice compared to the front end ([#81292](https://github.com/WordPress/gutenberg/pull/81292)).
