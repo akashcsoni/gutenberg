@@ -12,6 +12,7 @@
 -   Accordion Panel: Reset padding-block when panel is hidden ([#81782](https://github.com/WordPress/gutenberg/pull/81782)).
 -   Query: Stop writing `excludeCurrent: null` into the `query` attribute of blocks that never had the key. The mount effect that clears a stale exclusion treated the absent key as stale, changing the serialized markup of every pre-existing Query block as soon as the editor opened it ([#82147](https://github.com/WordPress/gutenberg/pull/82147)).
 -   Icon: Preserve intrinsic SVG styles when applying block styles or rotation, and keep stroke widths scaling with the block's size for compatibility ([#78808](https://github.com/WordPress/gutenberg/pull/78808)).
+-   Breadcrumbs, auto-registered PHP-only blocks: Don't pass `post_id` to the block-renderer endpoint when the current user can't edit the post referenced by the `postId` block context, which made the request fail with a 403 error; render without post context instead ([#80604](https://github.com/WordPress/gutenberg/pull/80604)).
 
 ### Internal
 
@@ -96,7 +97,6 @@
 -   Playlist: Update `@arraypress/waveform-player` to `^1.23.0`, which no longer sets `crossorigin="anonymous"` on its audio element, fixing playback of tracks served without CORS headers such as media offloaded to a CDN ([#80533](https://github.com/WordPress/gutenberg/pull/80533)).
 -   Post Content: Restrict the wrapper tag to the supported values offered in the editor.
 -   Post Date: Escape date values and link URLs before rendering the block.
--   Breadcrumbs, auto-registered PHP-only blocks: Don't pass `post_id` to the block-renderer endpoint when the current user can't edit the post referenced by the `postId` block context, which made the request fail with a 403 error; render without post context instead ([#80604](https://github.com/WordPress/gutenberg/pull/80604)).
 
 ### Internal
 
