@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### New Features
+
+-   Media Library modal: Add an "Attached to" filter offering "Uploaded to this post" and "Unattached", along with a `postId` prop supplying the post the modal was opened from.
+
 ### Bug Fixes
 
 -   Prevent editor block removal by stopping undo/redo event propagation when the Media Library modal is open ([#79898](https://github.com/WordPress/gutenberg/pull/79898)).
