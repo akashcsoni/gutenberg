@@ -5,6 +5,7 @@
 ### Enhancements
 
 -   Export `build-style/*`, so the stylesheet can be imported as `@wordpress/fields/build-style/style.css` [#81769](https://github.com/WordPress/gutenberg/pull/81769)).
+-   Append an ellipsis (`…`) to the labels of the actions that open a dialog requiring further input or confirmation (`Delete…`, `Trash…`, `Permanently delete…`, `Rename…`, `Duplicate…`, `Reset…`, `Order…`), following the menu ellipsis guideline. The dialog titles keep the ellipsis-free wording.
 
 ### Internal
 
@@ -88,7 +89,7 @@
 
 ### Enhancements
 
-- Update the base `titleField` to enable hiding. [#71369](https://github.com/WordPress/gutenberg/pull/71369)
+-   Update the base `titleField` to enable hiding. [#71369](https://github.com/WordPress/gutenberg/pull/71369)
 
 ## 0.21.0 (2025-08-20)
 

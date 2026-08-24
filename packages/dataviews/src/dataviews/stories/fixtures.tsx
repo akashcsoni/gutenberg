@@ -619,7 +619,7 @@ export const data: SpaceObject[] = [
 export const actions: Action< SpaceObject >[] = [
 	{
 		id: 'delete',
-		label: 'Delete item',
+		label: 'Delete item…',
 		isPrimary: true,
 		icon: trash,
 		modalHeader: ( items ) =>

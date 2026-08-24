@@ -523,7 +523,7 @@ export const orderEventActions: Action< OrderEvent >[] = [
 	},
 	{
 		id: 'delete-note',
-		label: 'Delete Note',
+		label: 'Delete Note…',
 		isPrimary: false,
 		icon: trash,
 		isEligible: ( item ) => item.type === 'note',
