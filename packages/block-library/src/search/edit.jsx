@@ -11,30 +11,19 @@ import {
 	useSettings,
 } from '@wordpress/block-editor';
 import { useDispatch, useSelect } from '@wordpress/data';
-import { useEffect, useRef } from '@wordpress/element';
+import { useEffect, useMemo, useRef } from '@wordpress/element';
 import {
 	SelectControl,
 	ToggleControl,
 	ResizableBox,
-	__experimentalUseCustomUnits as useCustomUnits,
-	__experimentalUnitControl as UnitControl,
-	__experimentalToggleGroupControl as ToggleGroupControl,
-	__experimentalToggleGroupControlOption as ToggleGroupControlOption,
 	__experimentalToolsPanel as ToolsPanel,
 	__experimentalToolsPanelItem as ToolsPanelItem,
-	__experimentalVStack as VStack,
 } from '@wordpress/components';
-import { useInstanceId } from '@wordpress/compose';
 import { Icon, search } from '@wordpress/icons';
-import { __, sprintf } from '@wordpress/i18n';
+import { __ } from '@wordpress/i18n';
 import { __unstableStripHTML as stripHTML } from '@wordpress/dom';
 import { speak } from '@wordpress/a11y';
-import {
-	PC_WIDTH_DEFAULT,
-	PX_WIDTH_DEFAULT,
-	MIN_WIDTH,
-	isPercentageUnit,
-} from './utils.js';
+import { MIN_WIDTH } from './utils.js';
 import { useToolsPanelDropdownMenuProps } from '../utils/hooks';
 
 // Help text describing each wrapper element option. Kept local to the block
@@ -54,7 +43,9 @@ const TAG_NAME_MESSAGES = {
 // Used to calculate border radius adjustment to avoid "fat" corners when
 // button is placed inside wrapper.
 const DEFAULT_INNER_PADDING = '4px';
-const PERCENTAGE_WIDTHS = [ 25, 50, 75, 100 ];
+
+// Dimension presets are stored by reference, e.g. `var:preset|dimension|50`.
+const DIMENSION_PRESET_PREFIX = 'var:preset|dimension|';
 
 export default function SearchEdit( {
 	className,
@@ -68,8 +59,6 @@ export default function SearchEdit( {
 		label,
 		showLabel,
 		placeholder,
-		width,
-		widthUnit,
 		align,
 		buttonText,
 		buttonPosition,
@@ -125,9 +114,10 @@ export default function SearchEdit( {
 	}
 
 	const colorProps = useColorProps( attributes );
-	const [ fluidTypographySettings, layout ] = useSettings(
+	const [ fluidTypographySettings, layout, dimensionSizes ] = useSettings(
 		'typography.fluid',
-		'layout'
+		'layout',
+		'dimensions.dimensionSizes'
 	);
 	const typographyProps = useTypographyProps( attributes, {
 		typography: {
@@ -137,8 +127,6 @@ export default function SearchEdit( {
 			wideSize: layout?.wideSize,
 		},
 	} );
-	const unitControlInstanceId = useInstanceId( UnitControl );
-	const unitControlInputId = `wp-block-search__width-${ unitControlInstanceId }`;
 	const isButtonPositionInside = 'button-inside' === buttonPosition;
 	const isButtonPositionOutside = 'button-outside' === buttonPosition;
 	const hasNoButton = 'no-button' === buttonPosition;
@@ -147,10 +135,33 @@ export default function SearchEdit( {
 	const searchFieldRef = useRef();
 	const buttonRef = useRef();
 
-	const units = useCustomUnits( {
-		availableUnits: [ '%', 'px' ],
-		defaultValues: { '%': PC_WIDTH_DEFAULT, px: PX_WIDTH_DEFAULT },
-	} );
+	// The width control writes a CSS length, which may be a preset reference.
+	// Resolve it so the resize handles have a real length to work from.
+	const width = style?.dimensions?.width;
+	const resolvedWidth = useMemo( () => {
+		if ( ! width || ! width.startsWith( DIMENSION_PRESET_PREFIX ) ) {
+			return width;
+		}
+		const slug = width.slice( DIMENSION_PRESET_PREFIX.length );
+		const preset = [
+			...( dimensionSizes?.custom ?? [] ),
+			...( dimensionSizes?.theme ?? [] ),
+			...( dimensionSizes?.default ?? [] ),
+		].find( ( size ) => size.slug === slug );
+		return preset?.size ?? width;
+	}, [ width, dimensionSizes ] );
+
+	const setWidth = ( nextWidth ) => {
+		setAttributes( {
+			style: {
+				...style,
+				dimensions: {
+					...style?.dimensions,
+					width: nextWidth,
+				},
+			},
+		} );
+	};
 
 	const getBlockClassNames = () => {
 		return clsx(
@@ -324,8 +335,6 @@ export default function SearchEdit( {
 					label={ __( 'Settings' ) }
 					resetAll={ () => {
 						setAttributes( {
-							width: undefined,
-							widthUnit: undefined,
 							showLabel: true,
 							buttonUseIcon: false,
 							buttonPosition: 'button-outside',
@@ -396,87 +405,6 @@ export default function SearchEdit( {
 							/>
 						</ToolsPanelItem>
 					) }
-					<ToolsPanelItem
-						hasValue={ () => !! width }
-						label={ __( 'Width' ) }
-						onDeselect={ () => {
-							setAttributes( {
-								width: undefined,
-								widthUnit: undefined,
-							} );
-						} }
-						isShownByDefault
-					>
-						<VStack>
-							<UnitControl
-								label={ __( 'Width' ) }
-								id={ unitControlInputId } // Unused, kept for backwards compatibility
-								min={
-									isPercentageUnit( widthUnit )
-										? 0
-										: MIN_WIDTH
-								}
-								max={
-									isPercentageUnit( widthUnit )
-										? 100
-										: undefined
-								}
-								step={ 1 }
-								onChange={ ( newWidth ) => {
-									const parsedNewWidth =
-										newWidth === ''
-											? undefined
-											: parseInt( newWidth, 10 );
-									setAttributes( {
-										width: parsedNewWidth,
-									} );
-								} }
-								onUnitChange={ ( newUnit ) => {
-									setAttributes( {
-										width:
-											'%' === newUnit
-												? PC_WIDTH_DEFAULT
-												: PX_WIDTH_DEFAULT,
-										widthUnit: newUnit,
-									} );
-								} }
-								__unstableInputWidth="80px"
-								value={ `${ width }${ widthUnit }` }
-								units={ units }
-							/>
-							<ToggleGroupControl
-								label={ __( 'Percentage Width' ) }
-								value={
-									PERCENTAGE_WIDTHS.includes( width ) &&
-									widthUnit === '%'
-										? width
-										: undefined
-								}
-								hideLabelFromVision
-								onChange={ ( newWidth ) => {
-									setAttributes( {
-										width: newWidth,
-										widthUnit: '%',
-									} );
-								} }
-								isBlock
-							>
-								{ PERCENTAGE_WIDTHS.map( ( widthValue ) => {
-									return (
-										<ToggleGroupControlOption
-											key={ widthValue }
-											value={ widthValue }
-											label={ sprintf(
-												/* translators: %d: Percentage value. */
-												__( '%d%%' ),
-												widthValue
-											) }
-										/>
-									);
-								} ) }
-							</ToggleGroupControl>
-						</VStack>
-					</ToolsPanelItem>
 				</ToolsPanel>
 			</InspectorControls>
 			<InspectorControls group="advanced">
@@ -611,10 +539,7 @@ export default function SearchEdit( {
 
 				<ResizableBox
 					size={ {
-						width:
-							width === undefined
-								? 'auto'
-								: `${ width }${ widthUnit }`,
+						width: resolvedWidth || 'auto',
 						height: 'auto',
 					} }
 					className={ clsx(
@@ -627,16 +552,14 @@ export default function SearchEdit( {
 					minWidth={ MIN_WIDTH }
 					enable={ getResizableSides() }
 					onResizeStart={ ( event, direction, elt ) => {
-						setAttributes( {
-							width: parseInt( elt.offsetWidth, 10 ),
-							widthUnit: 'px',
-						} );
+						// Pin the current rendered width in pixels so dragging
+						// starts from where the block is, whatever unit or
+						// preset it was set with.
+						setWidth( `${ parseInt( elt.offsetWidth, 10 ) }px` );
 						toggleSelection( false );
 					} }
-					onResizeStop={ ( event, direction, elt, delta ) => {
-						setAttributes( {
-							width: parseInt( width + delta.width, 10 ),
-						} );
+					onResizeStop={ ( event, direction, elt ) => {
+						setWidth( `${ parseInt( elt.offsetWidth, 10 ) }px` );
 						toggleSelection( true );
 					} }
 					showHandle={ isSelected }
