@@ -45,10 +45,19 @@ test.describe( 'Block template registration', () => {
 		).toBeVisible();
 
 		// Verify template is listed in the Site Editor.
-		await admin.visitSiteEditor( {
-			postType: 'wp_template',
-			activeView: isSiteEditorV2 ? 'gutenberg' : 'Gutenberg',
-		} );
+		if ( isSiteEditorV2 ) {
+			// The extensible editor's plugin-author view is named after the
+			// plugin, whose slug and casing vary with the environment the
+			// suite runs in, so pick its tab by name — role name matching is
+			// case-insensitive.
+			await admin.visitSiteEditor( { postType: 'wp_template' } );
+			await page.getByRole( 'tab', { name: 'gutenberg' } ).click();
+		} else {
+			await admin.visitSiteEditor( {
+				postType: 'wp_template',
+				activeView: 'Gutenberg',
+			} );
+		}
 		await blockTemplateRegistrationUtils.searchForTemplate(
 			'Plugin Template'
 		);
@@ -226,10 +235,19 @@ test.describe( 'Block template registration', () => {
 		blockTemplateRegistrationUtils,
 	} ) => {
 		// Make an edit to the template.
-		await admin.visitSiteEditor( {
-			postType: 'wp_template',
-			activeView: isSiteEditorV2 ? 'gutenberg' : 'Gutenberg',
-		} );
+		if ( isSiteEditorV2 ) {
+			// The extensible editor's plugin-author view is named after the
+			// plugin, whose slug and casing vary with the environment the
+			// suite runs in, so pick its tab by name — role name matching is
+			// case-insensitive.
+			await admin.visitSiteEditor( { postType: 'wp_template' } );
+			await page.getByRole( 'tab', { name: 'gutenberg' } ).click();
+		} else {
+			await admin.visitSiteEditor( {
+				postType: 'wp_template',
+				activeView: 'Gutenberg',
+			} );
+		}
 		await blockTemplateRegistrationUtils.searchForTemplate(
 			'Plugin Template'
 		);
