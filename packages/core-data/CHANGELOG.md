@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Enhancements
+
+-   Add `original_attachment` to the attachment `MediaDetails` type — present in the `edit` context when the attachment was created by editing another image ([#81803](https://github.com/WordPress/gutenberg/pull/81803)).
+
 ### Internal
 
 -   Remove unused dependency `@wordpress/is-shallow-equal` ([#82103](https://github.com/WordPress/gutenberg/pull/82103)).
