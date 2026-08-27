@@ -1,5 +1,8 @@
 const { test, expect } = require( '@wordpress/e2e-test-utils-playwright' );
 
+// Whether the run targets the extensible site editor (v2).
+const isSiteEditorV2 = !! process.env.GUTENBERG_E2E_SITE_EDITOR_V2;
+
 test.describe( 'Template Activate', () => {
 	test.beforeAll( async ( { requestUtils } ) => {
 		await requestUtils.activateTheme( 'emptytheme' );
@@ -32,6 +35,7 @@ test.describe( 'Template Activate', () => {
 		page,
 		admin,
 		editor,
+		requestUtils,
 	} ) => {
 		// Inside the grid cell, find the button with the text "Actions"
 		const index = page.locator(
@@ -82,9 +86,11 @@ test.describe( 'Template Activate', () => {
 
 		// The site title, rendered by the header template part. Exact, so a
 		// site tagline containing the word does not make the locator
-		// ambiguous.
+		// ambiguous. Read from the site settings: wp-env names the site after
+		// the directory it runs from, so the title is not always "gutenberg".
+		const { title: siteTitle } = await requestUtils.getSiteSettings();
 		await expect(
-			editor.canvas.getByText( 'gutenberg', { exact: true } )
+			editor.canvas.getByText( siteTitle, { exact: true } ).first()
 		).toBeVisible();
 
 		await editor.insertBlock( {
@@ -118,7 +124,11 @@ test.describe( 'Template Activate', () => {
 
 		await page.bringToFront();
 
-		await page.getByRole( 'button', { name: 'Open Navigation' } ).click();
+		await page
+			.getByRole( 'button', {
+				name: isSiteEditorV2 ? 'Go back' : 'Open Navigation',
+			} )
+			.click();
 
 		await actionsButton.click();
 

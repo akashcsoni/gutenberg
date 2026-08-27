@@ -1,5 +1,8 @@
 const { test, expect } = require( '@wordpress/e2e-test-utils-playwright' );
 
+// Whether the run targets the extensible site editor (v2).
+const isSiteEditorV2 = !! process.env.GUTENBERG_E2E_SITE_EDITOR_V2;
+
 test.use( {
 	blockTemplateRegistrationUtils: async ( { editor, page }, use ) => {
 		await use( new BlockTemplateRegistrationUtils( { editor, page } ) );
@@ -44,22 +47,38 @@ test.describe( 'Block template registration', () => {
 		// Verify template is listed in the Site Editor.
 		await admin.visitSiteEditor( {
 			postType: 'wp_template',
-			activeView: 'Gutenberg',
+			activeView: isSiteEditorV2 ? 'gutenberg' : 'Gutenberg',
 		} );
 		await blockTemplateRegistrationUtils.searchForTemplate(
 			'Plugin Template'
 		);
 		await expect( page.getByText( 'Plugin Template' ) ).toBeVisible();
 		await expect(
-			page.getByText( 'A template registered by a plugin.' )
+			// The v2 grid also renders the description in a hidden
+			// accessible-description node, so match the visible one.
+			page
+				.getByText( 'A template registered by a plugin.' )
+				.filter( { visible: true } )
+				.first()
 		).toBeVisible();
 
 		// Verify the template contents are rendered in the editor.
 		await page.getByText( 'Plugin Template' ).click();
 		await page.getByRole( 'button', { name: 'Duplicate' } ).click();
-		await page.waitForURL(
-			'/wp-admin/site-editor.php?p=%2Ftemplate&activeView=user'
-		);
+		if ( isSiteEditorV2 ) {
+			// The classic editor redirects to the user templates view after
+			// duplicating; the extensible one stays put, so wait for the
+			// confirmation and navigate there explicitly.
+			await page.waitForSelector( '.components-snackbar__content' );
+			await admin.visitSiteEditor( {
+				postType: 'wp_template',
+				activeView: 'user',
+			} );
+		} else {
+			await page.waitForURL(
+				'/wp-admin/site-editor.php?p=%2Ftemplate&activeView=user'
+			);
+		}
 		await page
 			.getByRole( 'button', { name: 'Plugin Template (Copy)' } )
 			.first()
@@ -108,7 +127,10 @@ test.describe( 'Block template registration', () => {
 		await page.getByRole( 'button', { name: 'Trash' } ).click();
 
 		await expect( resetNotice ).toBeVisible();
-		await expect( savedButton ).toBeVisible();
+		if ( ! isSiteEditorV2 ) {
+			// Only the classic editor shows the save hub on list screens.
+			await expect( savedButton ).toBeVisible();
+		}
 		await page.goto( '/?cat=1' );
 		await expect(
 			page.getByText( 'Content edited template.' )
@@ -185,9 +207,14 @@ test.describe( 'Block template registration', () => {
 		).toBeHidden();
 		// Verify the template description fall backs to the plugin registered description.
 		await expect(
-			page.getByText(
-				'A custom template registered by a plugin and overridden by a theme.'
-			)
+			page
+				.getByText(
+					'A custom template registered by a plugin and overridden by a theme.'
+				)
+				// The v2 grid also renders the description in a hidden
+				// accessible-description node, so match the visible one.
+				.filter( { visible: true } )
+				.first()
 		).toBeVisible();
 	} );
 
@@ -201,16 +228,27 @@ test.describe( 'Block template registration', () => {
 		// Make an edit to the template.
 		await admin.visitSiteEditor( {
 			postType: 'wp_template',
-			activeView: 'Gutenberg',
+			activeView: isSiteEditorV2 ? 'gutenberg' : 'Gutenberg',
 		} );
 		await blockTemplateRegistrationUtils.searchForTemplate(
 			'Plugin Template'
 		);
 		await page.getByText( 'Plugin Template' ).click();
 		await page.getByRole( 'button', { name: 'Duplicate' } ).click();
-		await page.waitForURL(
-			'/wp-admin/site-editor.php?p=%2Ftemplate&activeView=user'
-		);
+		if ( isSiteEditorV2 ) {
+			// The classic editor redirects to the user templates view after
+			// duplicating; the extensible one stays put, so wait for the
+			// confirmation and navigate there explicitly.
+			await page.waitForSelector( '.components-snackbar__content' );
+			await admin.visitSiteEditor( {
+				postType: 'wp_template',
+				activeView: 'user',
+			} );
+		} else {
+			await page.waitForURL(
+				'/wp-admin/site-editor.php?p=%2Ftemplate&activeView=user'
+			);
+		}
 		await page
 			.getByRole( 'button', { name: 'Plugin Template (Copy)' } )
 			.first()
@@ -251,7 +289,10 @@ test.describe( 'Block template registration', () => {
 		await page.getByRole( 'button', { name: 'Trash' } ).click();
 
 		await expect( deletedNotice ).toBeVisible();
-		await expect( savedButton ).toBeVisible();
+		if ( ! isSiteEditorV2 ) {
+			// Only the classic editor shows the save hub on list screens.
+			await expect( savedButton ).toBeVisible();
+		}
 
 		// Expect template to no longer appear in the Site Editor.
 		await expect( page.getByLabel( 'Actions' ) ).toBeHidden();
@@ -398,8 +439,15 @@ class BlockTemplateRegistrationUtils {
 		await expect
 			.poll( async () => await searchResults.count() )
 			.toBeLessThanOrEqual( initialSearchResultsCount );
+		// Normalise the URL before matching: the extensible site editor nests
+		// the route query inside the `p` param (encoding it a second time) and
+		// encodes spaces as `+`.
 		await expect
-			.poll( async () => this.page.url() )
-			.toContain( `search=${ encodeURIComponent( searchTerm ) }` );
+			.poll( async () =>
+				decodeURIComponent(
+					decodeURIComponent( this.page.url() )
+				).replace( /\+/g, ' ' )
+			)
+			.toContain( `search=${ searchTerm }` );
 	}
 }
