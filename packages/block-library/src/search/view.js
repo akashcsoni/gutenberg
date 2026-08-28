@@ -5,6 +5,34 @@ import {
 	withSyncEvent,
 } from '@wordpress/interactivity';
 
+const getBackgroundColor = ( element ) => {
+	while ( element ) {
+		const { backgroundColor } = window.getComputedStyle( element );
+		if (
+			backgroundColor !== 'transparent' &&
+			backgroundColor !== 'rgba(0, 0, 0, 0)'
+		) {
+			return backgroundColor;
+		}
+		element = element.parentElement;
+	}
+	// Use the browser's canvas color when no ancestor paints a background.
+	return 'Canvas';
+};
+
+const updateMobileOverlay = ( search ) => {
+	const overlay = search.querySelector( '.wp-block-search__mobile-overlay' );
+	// CSS owns the breakpoint. Desktop does not need any layout measurements.
+	if ( window.getComputedStyle( overlay ).position !== 'absolute' ) {
+		return;
+	}
+	const wrapper = overlay.parentElement;
+	overlay.style.left = `${
+		-wrapper.getBoundingClientRect().left - wrapper.clientLeft
+	}px`;
+	overlay.style.backgroundColor = getBackgroundColor( wrapper );
+};
+
 const { actions } = store(
 	'core/search',
 	{
@@ -38,6 +66,7 @@ const { actions } = store(
 				const { ref } = getElement();
 				if ( ! ctx.isSearchInputVisible ) {
 					event.preventDefault();
+					updateMobileOverlay( ref.closest( '.wp-block-search' ) );
 					ctx.isSearchInputVisible = true;
 					ref.parentElement.querySelector( 'input' ).focus();
 				}
@@ -46,12 +75,16 @@ const { actions } = store(
 				const ctx = getContext();
 				ctx.isSearchInputVisible = false;
 			},
-			handleSearchKeydown: withSyncEvent( ( event ) => {
+			handleSearchKeydown: withSyncEvent( function* ( event ) {
 				const { ref } = getElement();
 				// If Escape close the menu.
 				if ( event?.key === 'Escape' ) {
 					actions.closeSearchInput();
-					ref.querySelector( 'button' ).focus();
+					// Make sure the button is visible before focusing it.
+					yield new Promise( window.requestAnimationFrame );
+					ref.querySelector(
+						'.wp-block-search__inside-wrapper > button'
+					).focus();
 				}
 			} ),
 			handleSearchFocusout: withSyncEvent( ( event ) => {
@@ -65,9 +98,32 @@ const { actions } = store(
 					! ref.contains( event.relatedTarget ) &&
 					event.target !== window.document.activeElement
 				) {
+					// A breakpoint change can hide the focused button. Keep focus
+					// in the open search instead of treating this as leaving it.
+					if (
+						getContext().isSearchInputVisible &&
+						! event.relatedTarget &&
+						( ! event.target.getClientRects().length ||
+							window.getComputedStyle( event.target )
+								.visibility === 'hidden' )
+					) {
+						const input = ref.querySelector( 'input' );
+						input.focus();
+						if ( ref.ownerDocument.activeElement === input ) {
+							return;
+						}
+					}
 					actions.closeSearchInput();
 				}
 			} ),
+		},
+		callbacks: {
+			resizeSearch() {
+				const { ref } = getElement();
+				if ( getContext().isSearchInputVisible ) {
+					updateMobileOverlay( ref );
+				}
+			},
 		},
 	},
 	{ lock: true }
