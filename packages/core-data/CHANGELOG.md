@@ -4,7 +4,7 @@
 
 ### Enhancements
 
--   Add the root-level `original_attachment` field to the `Attachment` entity type — present in the `edit` context when the attachment was created by editing another image ([#81803](https://github.com/WordPress/gutenberg/pull/81803)).
+-   Add the root-level `original_attachment` field to the `Attachment` entity type — the original attachment's id, embeddable via the `wp:original-attachment` link, present in the `edit` context when the attachment was created by editing another image ([#81803](https://github.com/WordPress/gutenberg/pull/81803)).
 
 ### Internal
 
