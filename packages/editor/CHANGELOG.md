@@ -5,6 +5,7 @@
 ### Breaking Changes
 
 -   `PluginMoreMenuItem`, `PluginSidebarMoreMenuItem`: Items render with the `Menu` component of `@wordpress/ui` instead of `MenuItem`. A link item honors only `target="_blank"`, and a custom `as` has to forward its ref ([#81564](https://github.com/WordPress/gutenberg/pull/81564)).
+-   `PostTaxonomiesFlatTermSelector`: The field renders with the `SearchableChipSelectControl` component of `@wordpress/ui` instead of `FormTokenField` ([#80967](https://github.com/WordPress/gutenberg/pull/80967)).
 
 ### Bug Fixes
 
