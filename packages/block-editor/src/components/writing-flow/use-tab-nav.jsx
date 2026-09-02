@@ -1,7 +1,8 @@
 import { focus, isFormElement } from '@wordpress/dom';
 import { TAB } from '@wordpress/keycodes';
+import { __ } from '@wordpress/i18n';
 import { useSelect, useDispatch } from '@wordpress/data';
-import { useRefEffect, useMergeRefs } from '@wordpress/compose';
+import { useRefEffect, useMergeRefs, useInstanceId } from '@wordpress/compose';
 import { useRef } from '@wordpress/element';
 import { store as blockEditorStore } from '../../store';
 import { isInSameBlock, isInsideRootBlock } from '../../utils/dom';
@@ -11,6 +12,7 @@ export default function useTabNav() {
 	const containerRef = /** @type {typeof useRef<HTMLElement>} */ ( useRef )();
 	const focusCaptureBeforeRef = useRef();
 	const focusCaptureAfterRef = useRef();
+	const hintId = useInstanceId( useTabNav, 'block-editor-canvas-stop-hint' );
 
 	const {
 		hasMultiSelection,
@@ -23,39 +25,38 @@ export default function useTabNav() {
 	} = unlock( useSelect( blockEditorStore ) );
 	const { setLastFocus } = unlock( useDispatch( blockEditorStore ) );
 
-	// Reference that holds the a flag for enabling or disabling
-	// capturing on the focus capture elements.
-	const noCaptureRef = useRef();
-
-	function onFocusCapture( event ) {
-		const canvasElement =
-			containerRef.current.ownerDocument === event.target.ownerDocument
-				? containerRef.current
-				: containerRef.current.ownerDocument.defaultView.frameElement;
-
-		// Do not capture incoming focus if set by us in WritingFlow.
-		if ( noCaptureRef.current ) {
-			noCaptureRef.current = null;
-		} else if ( hasMultiSelection() ) {
+	// The canvas is a single stop in the page's tab order: the two stop
+	// elements sit on either side of it, and going in is an explicit action
+	// on them. Focus returns to the place it last left the canvas from.
+	function enterCanvas( fromAfter ) {
+		if ( hasMultiSelection() ) {
 			containerRef.current.focus();
-		} else if ( getSelectedBlockClientId() ) {
+			return;
+		}
+
+		if ( getSelectedBlockClientId() ) {
 			if ( getLastFocus()?.current ) {
 				getLastFocus().current.focus();
 			} else {
-				// Handles when the last focus has not been set yet, or has been cleared by new blocks being added via the inserter.
+				// Handles when the last focus has not been set yet, or has
+				// been cleared by new blocks being added via the inserter.
 				containerRef.current
 					.querySelector(
 						`[data-block="${ getSelectedBlockClientId() }"]`
 					)
 					.focus();
 			}
+			return;
 		}
-		// In "compose" mode without a selected ID, we want to place focus on the section root when tabbing to the canvas.
-		else if ( isZoomOut() ) {
+
+		// In "compose" mode without a selected ID, place focus on the
+		// section root when entering the canvas.
+		if ( isZoomOut() ) {
 			const sectionRootClientId = getSectionRootClientId();
 			const sectionBlocks = getBlockOrder( sectionRootClientId );
 
-			// If we have section within the section root, focus the first one.
+			// If we have a section within the section root, focus the first
+			// one.
 			if ( sectionBlocks.length ) {
 				containerRef.current
 					.querySelector( `[data-block="${ sectionBlocks[ 0 ] }"]` )
@@ -67,38 +68,94 @@ export default function useTabNav() {
 					.querySelector( `[data-block="${ sectionRootClientId }"]` )
 					.focus();
 			} else {
-				// If we don't have any section root, focus the canvas.
-				canvasElement.focus();
+				containerRef.current.focus();
 			}
-		} else {
-			const isBefore =
-				// eslint-disable-next-line no-bitwise
-				event.target.compareDocumentPosition( canvasElement ) &
-				event.target.DOCUMENT_POSITION_FOLLOWING;
-			const tabbables = focus.tabbable.find( containerRef.current );
-			if ( tabbables.length ) {
-				const next = isBefore
-					? tabbables[ 0 ]
-					: tabbables[ tabbables.length - 1 ];
-				next.focus();
-			}
+			return;
+		}
+
+		const tabbables = focus.tabbable.find( containerRef.current );
+		if ( tabbables.length ) {
+			const next = fromAfter
+				? tabbables[ tabbables.length - 1 ]
+				: tabbables[ 0 ];
+			next.focus();
 		}
 	}
+
+	function onStopKeyDown( event, isAfter ) {
+		if (
+			event.defaultPrevented ||
+			event.ctrlKey ||
+			event.metaKey ||
+			event.altKey
+		) {
+			return;
+		}
+
+		const { key } = event;
+
+		if (
+			! event.shiftKey &&
+			( key === 'Enter' ||
+				key === ' ' ||
+				key === 'F2' ||
+				key === 'Escape' ||
+				key === 'ArrowDown' ||
+				key === 'ArrowUp' )
+		) {
+			event.preventDefault();
+			enterCanvas( key === 'ArrowUp' ? true : isAfter );
+			return;
+		}
+
+		// The whole canvas is one stop: Tab moves past it, so from the stop
+		// before it, skip over the contents and the stop after it, and the
+		// other way around backwards.
+		if ( key === 'Tab' && ! event.shiftKey && ! isAfter ) {
+			event.preventDefault();
+			focus.tabbable.findNext( focusCaptureAfterRef.current )?.focus();
+			return;
+		}
+		if ( key === 'Tab' && event.shiftKey && isAfter ) {
+			event.preventDefault();
+			focus.tabbable
+				.findPrevious( focusCaptureBeforeRef.current )
+				?.focus();
+		}
+	}
+
+	const stopHint = ( id ) => (
+		<div className="block-editor-writing-flow__canvas-stop-hint" id={ id }>
+			{ __( 'Press Enter to edit the document' ) }
+		</div>
+	);
 
 	const before = (
 		<div
 			ref={ focusCaptureBeforeRef }
 			tabIndex="0"
-			onFocus={ onFocusCapture }
-		/>
+			role="button"
+			aria-label={ __( 'Editor canvas' ) }
+			aria-describedby={ `${ hintId }-before` }
+			className="block-editor-writing-flow__canvas-stop is-before"
+			onKeyDown={ ( event ) => onStopKeyDown( event, false ) }
+		>
+			{ stopHint( `${ hintId }-before` ) }
+		</div>
 	);
 
 	const after = (
 		<div
 			ref={ focusCaptureAfterRef }
 			tabIndex="0"
-			onFocus={ onFocusCapture }
-		/>
+			role="button"
+			aria-label={ __( 'Editor canvas' ) }
+			aria-describedby={ `${ hintId }-after` }
+			className="block-editor-writing-flow__canvas-stop is-after"
+			onKeyDown={ ( event ) => onStopKeyDown( event, true ) }
+		>
+			{ stopHint( `${ hintId }-after` ) }
+		</div>
 	);
 
 	const ref = useRefEffect( ( node ) => {
@@ -107,12 +164,34 @@ export default function useTabNav() {
 				return;
 			}
 
+			// Escape steps out of the canvas onto the stop before it.
+			// Listeners delegated at a document level, among them the canvas
+			// listener undoing an automatic change, run after this handler
+			// for the same press. Waiting a microtask lets every one of them
+			// claim the key first: event dispatch is synchronous, so by then
+			// the event carries the final word.
+			if (
+				event.key === 'Escape' &&
+				! event.ctrlKey &&
+				! event.metaKey &&
+				! event.altKey
+			) {
+				queueMicrotask( () => {
+					if ( event.defaultPrevented ) {
+						return;
+					}
+					focusCaptureBeforeRef.current?.focus( {
+						preventScroll: true,
+					} );
+				} );
+				return;
+			}
+
 			// In Edit mode, Tab should focus the first tabbable element after
 			// the content, which is normally the sidebar (with block controls)
 			// and Shift+Tab should focus the first tabbable element before the
 			// content, which is normally the block toolbar.
-			// Arrow keys can be used, and Tab and arrow keys can be used in
-			// Navigation mode (press Esc), to navigate through blocks.
+			// Arrow keys can be used to navigate through blocks.
 			if ( event.keyCode !== TAB ) {
 				return;
 			}
@@ -155,17 +234,14 @@ export default function useTabNav() {
 			) {
 				return;
 			}
-			const next = isShift ? focusCaptureBeforeRef : focusCaptureAfterRef;
 
-			// Disable focus capturing on the focus capture element, so it
-			// doesn't refocus this block and so it allows default behaviour
-			// (moving focus to the next tabbable element).
-			noCaptureRef.current = true;
-
-			// Focusing the focus capture element, which is located above and
-			// below the editor, should not scroll the page all the way up or
-			// down.
-			next.current.focus( { preventScroll: true } );
+			// Tab out of the canvas: move focus past the stop on the side
+			// being tabbed towards, without stopping on it.
+			event.preventDefault();
+			const outside = isShift
+				? focus.tabbable.findPrevious( focusCaptureBeforeRef.current )
+				: focus.tabbable.findNext( focusCaptureAfterRef.current );
+			outside?.focus();
 		}
 
 		function onFocusOut( event ) {
@@ -191,47 +267,9 @@ export default function useTabNav() {
 			}
 		}
 
-		// When tabbing back to an element in block list, this event handler prevents scrolling if the
-		// focus capture divs (before/after) are outside of the viewport. (For example shift+tab back to a paragraph
-		// when focus is on a sidebar element. This prevents the scrollable writing area from jumping either to the
-		// top or bottom of the document.
-		//
-		// Note that it isn't possible to disable scrolling in the onFocus event. We need to intercept this
-		// earlier in the keypress handler, and call focus( { preventScroll: true } ) instead.
-		// https://developer.mozilla.org/en-US/docs/Web/API/HTMLOrForeignElement/focus#parameters
-		function preventScrollOnTab( event ) {
-			if ( event.keyCode !== TAB ) {
-				return;
-			}
-
-			if ( event.target?.getAttribute( 'role' ) === 'region' ) {
-				return;
-			}
-
-			if ( containerRef.current === event.target ) {
-				return;
-			}
-
-			const isShift = event.shiftKey;
-			const direction = isShift ? 'findPrevious' : 'findNext';
-			const target = focus.tabbable[ direction ]( event.target );
-			// Only do something when the next tabbable is a focus capture div (before/after)
-			if (
-				target === focusCaptureBeforeRef.current ||
-				target === focusCaptureAfterRef.current
-			) {
-				event.preventDefault();
-				target.focus( { preventScroll: true } );
-			}
-		}
-
-		const { ownerDocument } = node;
-		const { defaultView } = ownerDocument;
-		defaultView.addEventListener( 'keydown', preventScrollOnTab );
 		node.addEventListener( 'keydown', onKeyDown );
 		node.addEventListener( 'focusout', onFocusOut );
 		return () => {
-			defaultView.removeEventListener( 'keydown', preventScrollOnTab );
 			node.removeEventListener( 'keydown', onKeyDown );
 			node.removeEventListener( 'focusout', onFocusOut );
 		};
